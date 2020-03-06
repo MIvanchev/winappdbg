@@ -961,7 +961,7 @@ class Thread (object):
         calling L{Process.read} and L{Process.write}.
 
         @type  segment: str, int or long
-        @param segment: Segment register name or DWORD descriptor table index.
+        @param segment: Segment register name or DWORD selector.
 
         @type  address: int
         @param address: Segment relative memory address.
@@ -969,52 +969,112 @@ class Thread (object):
         @rtype:  int
         @return: Linear memory address.
 
-        @raise ValueError: Address is too large for selector.
+        @raise ValueError: Address is invalid for the specified segment.
 
         @raise WindowsError:
             The current architecture does not support selectors.
             Selectors only exist in x86-based systems.
         """
 
+        register = None
         selector = None
 
         if isinstance(segment, str):
-            selector = self.get_register(segment)
+            register = segment
+            selector = self.get_register(register)
         elif isinstance(segment, (int, long)):
-            segment = long(segment)
+            selector = long(segment)
 
-            if segment < 0L or segment > 0xFFFFFFFFL:
-                msg = "Descriptor table index %d is an invalid DWORD."
-                msg = msg % segment
+            if selector < 0L or selector > 0xFFFFFFFFL:
+                msg = "Selector %d is an invalid DWORD."
+                msg = msg % selector
                 raise ValueError(msg)
-
-            selector = segment
         else:
             raise ValueError("Argument 'segment' must be a string or a DWORD.")
 
-        hThread  = self.get_handle(win32.THREAD_QUERY_INFORMATION)
-        ldt      = win32.GetThreadSelectorEntry(hThread, selector)
-        BaseLow  = ldt.BaseLow
-        BaseMid  = ldt.HighWord.Bytes.BaseMid << 16
-        BaseHi   = ldt.HighWord.Bytes.BaseHi  << 24
-        Base     = BaseLow | BaseMid | BaseHi
-        LimitLow = ldt.LimitLow
-        LimitHi  = ldt.HighWord.Bits.LimitHi  << 16
-        Limit    = LimitLow | LimitHi
-        if address > Limit:
-            msg = None
+        hThread = self.get_handle(win32.THREAD_QUERY_INFORMATION)
+        ldt     = win32.GetThreadSelectorEntry(hThread, selector)
 
-            if isinstance(segment, str):
-                msg = "Address %s too large for segment %s (selector %d)"
-                msg = msg % (HexDump.address(address, self.get_bits()),
-                            segment, selector)
-            else:
-                msg = "Address %s too large for segment with selector %d"
-                msg = msg % (HexDump.address(address, self.get_bits()),
-                            selector)
+        self.__validate_segment_offset(ldt, register, selector, address)
+
+        BaseLow = ldt.BaseLow
+        BaseMid = ldt.HighWord.Bytes.BaseMid << 16
+        BaseHi  = ldt.HighWord.Bytes.BaseHi  << 24
+        Base    = BaseLow | BaseMid | BaseHi
+
+        return Base + address
+
+    def __validate_segment_offset(self, ldt, reg, selector, address):
+        """
+        Validates a segment offset.
+
+        @type  ldt: L{LDT_ENTRY}
+        @param ldt: Contents of the segment descriptor.
+
+        @type  reg: str
+        @param reg: Name of the used segment register.
+
+        @type  selector: long
+        @param selector: DWORD descriptor table index (selector).
+
+        @type  address: int
+        @param address: Segment relative memory address.
+
+        @raise ValueError:
+            The selector identifies a system descriptor or the offset is
+            invalid for the segment.
+        """
+        Type        = ldt.HighWord.Bits.Type
+        Granularity = ldt.HighWord.Bits.Granularity
+        Default_Big = ldt.HighWord.Bits.Default_Big
+        LimitLow    = ldt.LimitLow
+        LimitHi     = ldt.HighWord.Bits.LimitHi  << 16
+        Limit       = LimitLow | LimitHi
+
+        if not Type & 0x10:
+            reg_msg = " (register %s)" % reg[3:].upper() if reg else ""
+
+            msg = "Selector %d%s identifies a system descriptor."
+            msg = msg % (selector, reg_msg)
 
             raise ValueError(msg)
-        return Base + address
+
+        if Granularity:
+            Limit = (Limit << 12) | 0x0FFF
+
+        valid_offsets = None
+
+        # Special case: expand-down data segments
+
+        if Type & 0b1100 == 0b0100:
+            max_offset = 0xFFFFFFFF if Default_Big else 0xFFFF
+
+            if address <= Limit or address > max_offset:
+                valid_offsets = (Limit+1, max_offset)
+
+        elif address > Limit:
+            valid_offsets = (0, Limit)
+
+        if valid_offsets:
+            reg_msg = " (register %s)" % reg[3:].upper() if reg else ""
+
+            prefix = "Offset %s is invalid for the segment with selector %d%s."
+            prefix = prefix % (HexDump.address(address, self.get_bits()),
+                              selector, reg_msg)
+
+            (first, last) = valid_offsets
+
+            if first > last:
+                msg = "The segment does not span any memory locations."
+            elif first == last:
+                msg = "The segment spans only 1 byte at offset %s."
+                msg = msg % (HexDump.address(address, self.get_bits()))
+            else:
+                msg = "The segment spans the bytes from offset %s through %s."
+                msg = msg % (HexDump.address(first, self.get_bits()),
+                            HexDump.address(last, self.get_bits()))
+
+            raise ValueError("%s %s" % (prefix, msg))
 
     def get_label_at_pc(self):
         """
