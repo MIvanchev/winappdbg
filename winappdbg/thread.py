@@ -969,8 +969,9 @@ class Thread (object):
         @rtype:  int
         @return: Linear memory address.
 
-        @raise ValueError: Segment identifies a system descriptor or address is
-                           invalid for the specified segment.
+        @raise ValueError:
+            Segment identifies a system descriptor or address is invalid for
+            the specified segment.
 
         @raise WindowsError:
             The current architecture does not support selectors.
@@ -1009,7 +1010,7 @@ class Thread (object):
         """
         Validates a segment offset.
 
-        @type  ldt: L{LDT_ENTRY}
+        @type  ldt: L{win32.LDT_ENTRY}
         @param ldt: Contents of the segment descriptor.
 
         @type  reg: str
