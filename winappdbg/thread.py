@@ -1061,7 +1061,7 @@ class Thread (object):
 
             prefix = "Offset %s is invalid for the segment with selector %d%s."
             prefix = prefix % (HexDump.address(address, self.get_bits()),
-                              selector, reg_msg)
+                               selector, reg_msg)
 
             (first, last) = err_valid_offsets
 
@@ -1073,7 +1073,7 @@ class Thread (object):
             else:
                 msg = "The segment spans the bytes from offset %s through %s."
                 msg = msg % (HexDump.address(first, self.get_bits()),
-                            HexDump.address(last, self.get_bits()))
+                             HexDump.address(last, self.get_bits()))
 
             raise ValueError("%s %s" % (prefix, msg))
 
