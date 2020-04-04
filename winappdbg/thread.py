@@ -1042,7 +1042,7 @@ class Thread (object):
         if Granularity:
             Limit = (Limit << 12) | 0x0FFF
 
-        valid_offsets = None
+        err_valid_offsets = None
 
         # Special case: expand-down data segments
 
@@ -1050,19 +1050,19 @@ class Thread (object):
             max_offset = 0xFFFFFFFF if Default_Big else 0xFFFF
 
             if address <= Limit or address > max_offset:
-                valid_offsets = (Limit+1, max_offset)
+                err_valid_offsets = (Limit+1, max_offset)
 
         elif address > Limit:
-            valid_offsets = (0, Limit)
+            err_valid_offsets = (0, Limit)
 
-        if valid_offsets:
+        if err_valid_offsets:
             reg_msg = " (register %s)" % reg[3:].upper() if reg else ""
 
             prefix = "Offset %s is invalid for the segment with selector %d%s."
             prefix = prefix % (HexDump.address(address, self.get_bits()),
                               selector, reg_msg)
 
-            (first, last) = valid_offsets
+            (first, last) = err_valid_offsets
 
             if first > last:
                 msg = "The segment does not span any memory locations."

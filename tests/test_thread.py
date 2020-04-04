@@ -160,7 +160,8 @@ class ThreadTests(unittest.TestCase):
             descriptor_for_a(
                 segment_of_type(DataReadOnlyExpandDownAccessed)
                 .with_base_address(0x10)
-                .and_with_limit_in_pages(9)))
+                .and_with_limit_in_pages(9)
+                .and_with_max_offset_0xFFFF()))
 
         self.assertEqual(
             winappdbg.Thread(99407).get_linear_address(17, 0xABCD),
@@ -181,6 +182,20 @@ class ThreadTests(unittest.TestCase):
             cm.exception.message,
             "Offset 00008000 is invalid for the segment with selector 40. The "
             "segment spans the bytes from offset 00000000 through 00007FFF.")
+
+        # Test code segment, max offset has no effect
+
+        mock_GetThreadSelectorEntry.return_value = (
+            descriptor_for_a(
+                segment_of_type(CodeExecuteReadAccessed)
+                .with_base_address(0)
+                .and_with_limit_in_bytes(0x7FFFA)
+                .and_with_max_offset_0xFFFF()))
+
+        with get_register_mock(50):
+            self.assertEqual(
+                winappdbg.Thread(83120).get_linear_address('SegDs', 0x43097),
+                0x43097)
 
         # Test code segment, conforming not misinterpreted for expand down
 
