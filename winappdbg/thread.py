@@ -969,7 +969,8 @@ class Thread (object):
         @rtype:  int
         @return: Linear memory address.
 
-        @raise ValueError: Address is invalid for the specified segment.
+        @raise ValueError: Segment identifies a system descriptor or address is
+                           invalid for the specified segment.
 
         @raise WindowsError:
             The current architecture does not support selectors.
