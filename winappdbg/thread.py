@@ -1031,7 +1031,7 @@ class Thread (object):
         LimitHi     = ldt.HighWord.Bits.LimitHi  << 16
         Limit       = LimitLow | LimitHi
 
-        if not Type & 0x10:
+        if not Type & 0b10000:
             reg_msg = " (register %s)" % reg[3:].upper() if reg else ""
 
             msg = "Selector %d%s identifies a system descriptor."
