@@ -74,7 +74,7 @@ class Segment(object):
 
 def system_descriptor():
     ldt = winappdbg.win32.LDT_ENTRY()
-    ldt.HighWord.Bits.Type = 1 << 5
+    ldt.HighWord.Bits.Type &= ~(1 << 4)
     return ldt
 
 def descriptor_for_a(segment):
@@ -140,7 +140,7 @@ class ThreadTests(unittest.TestCase):
             "(register SS). The segment spans the bytes from offset 00005000 "
             "through 0000FFFF.")
 
-        # Test expand down data segment; offset below maximum 0xFFFFFFFF, but
+        # Test expand down data segment; offset below maximum 0xFFFFFFFF but
         # above 0xFFFF
 
         mock_GetThreadSelectorEntry.return_value = (
